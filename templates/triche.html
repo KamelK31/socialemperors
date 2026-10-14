@@ -1,0 +1,104 @@
+{% extends "outils_base.html" %}
+{% block title %}Triche - Social Empires{% endblock %}
+{% block content %}
+{% if message %}<div class="card ok"><p>{{ message }}</p></div>{% endif %}
+{% if error %}<div class="card err"><p>{{ error }}</p></div>{% endif %}
+<div class="card">
+	<h1>Menu de triche</h1>
+	<p>Il ne marche que sur les parties coch&eacute;es <b>partie de test</b> : tes vraies parties restent legit.
+	Avant chaque triche, une copie de la partie est faite (page Sauvegardes), donc tout est annulable.</p>
+	<p class="muted">Apr&egrave;s une triche, recharge le jeu (F5) pour la voir.</p>
+	<form method="get" action="/triche">
+		<b>Partie :</b>
+		<select name="uid" onchange="this.form.submit()" style="font: inherit; padding: 3px;">
+			{% for g in games %}<option value="{{ g.uid }}" {% if g.uid == selected %}selected{% endif %}>{{ g.name }} (niveau {{ g.level }}){% if g.test %} - test{% endif %}</option>{% endfor %}
+		</select>
+	</form>
+</div>
+{% for g in games if g.uid == selected %}
+<div class="card">
+	<h2>{{ g.name }}</h2>
+	<p>Niveau <b>{{ g.level }}</b> &middot; {{ g.cash }} cash &middot; {{ g.coins }} or &middot; {{ g.wood }} bois &middot; {{ g.stone }} pierre &middot; {{ g.food }} nourriture &middot; {{ g.mana }} mana &middot; {{ g.potion }} potions</p>
+	<form method="post" action="/triche/test">
+		<input type="hidden" name="uid" value="{{ g.uid }}">
+		{% if g.test %}
+		<p>&#x2705; C'est une <b>partie de test</b>. <input type="hidden" name="on" value="0"><button class="btn" type="submit">La remettre en partie normale</button></p>
+		{% else %}
+		<p>Partie normale : la triche est bloqu&eacute;e. <input type="hidden" name="on" value="1"><button class="btn main" type="submit">C'est une partie de test</button></p>
+		{% endif %}
+	</form>
+</div>
+{% if g.test %}
+<div class="card">
+	<h2>Ressources</h2>
+	<form method="post" action="/triche/appliquer">
+		<input type="hidden" name="uid" value="{{ g.uid }}"><input type="hidden" name="action" value="ressources">
+		<p class="muted">Laisse vide ce que tu ne veux pas changer. Or, bois, pierre et nourriture : dans toutes tes villes.</p>
+		<p>Cash <input name="cash" size="9" inputmode="numeric"> &nbsp; Or <input name="coins" size="9" inputmode="numeric"> &nbsp; Bois <input name="wood" size="9" inputmode="numeric"><br>
+		Pierre <input name="stone" size="9" inputmode="numeric"> &nbsp; Nourriture <input name="food" size="9" inputmode="numeric"></p>
+		<p><button class="btn main" type="submit">Appliquer</button>
+		<button class="btn" type="submit" onclick="for (const n of ['cash','coins','wood','stone','food']) this.form[n].value='100000';">Tout &agrave; 100 000</button></p>
+	</form>
+</div>
+<div class="card">
+	<h2>Niveau</h2>
+	<form method="post" action="/triche/appliquer">
+		<input type="hidden" name="uid" value="{{ g.uid }}"><input type="hidden" name="action" value="niveau">
+		<p>Niveau <input name="level" type="number" min="1" max="{{ max_level }}" value="{{ g.level }}" style="width: 70px;"> (maximum {{ max_level }})
+		<button class="btn main" type="submit">Appliquer</button></p>
+	</form>
+</div>
+<div class="card">
+	<h2>Mana et potions</h2>
+	<form method="post" action="/triche/appliquer">
+		<input type="hidden" name="uid" value="{{ g.uid }}"><input type="hidden" name="action" value="mana">
+		<p>Mana <input name="mana" size="7" inputmode="numeric"> &nbsp; Potions <input name="potion" size="7" inputmode="numeric">
+		<button class="btn main" type="submit">Appliquer</button></p>
+	</form>
+</div>
+<div class="card">
+	<h2>Ajouter une unit&eacute; ou un b&acirc;timent &agrave; l'entrep&ocirc;t</h2>
+	<form method="post" action="/triche/appliquer">
+		<input type="hidden" name="uid" value="{{ g.uid }}"><input type="hidden" name="action" value="objet">
+		<p>Cherche <input id="search" placeholder="ex : dragon, samurai, tower" size="24" oninput="filterItems()"></p>
+		<p><select name="item" id="items" size="8" style="width: 100%; font: inherit;" required></select></p>
+		<p>Quantit&eacute; <input name="qty" type="number" min="1" max="500" value="1" style="width: 70px;">
+		{% if g.towns|length > 1 %}&nbsp; Ville <select name="town">{% for t in g.towns %}<option value="{{ loop.index0 }}">{{ t }}</option>{% endfor %}</select>{% else %}<input type="hidden" name="town" value="0">{% endif %}
+		<button class="btn main" type="submit">Ajouter</button></p>
+		<p class="muted">L'objet arrive dans l'entrep&ocirc;t (bouton Storage dans le jeu) : clique sur &laquo; Use &raquo; pour le poser.</p>
+	</form>
+</div>
+<div class="card">
+	<h2>Divers</h2>
+	<form method="post" action="/triche/appliquer" style="display: inline;">
+		<input type="hidden" name="uid" value="{{ g.uid }}"><input type="hidden" name="action" value="quetes">
+		<button class="btn" type="submit">Remettre &agrave; z&eacute;ro l'attente des qu&ecirc;tes</button>
+	</form>
+	<form method="post" action="/triche/appliquer" style="display: inline;">
+		<input type="hidden" name="uid" value="{{ g.uid }}"><input type="hidden" name="action" value="bouclier">
+		<button class="btn" type="submit">Retirer le bouclier</button>
+	</form>
+</div>
+<script>
+	var ITEMS = {{ items_json | safe }};
+	var KIND = { u: "unité", b: "bâtiment" };
+	function filterItems() {
+		var q = document.getElementById("search").value.toLowerCase().trim();
+		var sel = document.getElementById("items");
+		sel.innerHTML = "";
+		var shown = 0;
+		for (var i = 0; i < ITEMS.length && shown < 300; i++) {
+			var it = ITEMS[i];
+			if (q && it.n.toLowerCase().indexOf(q) < 0) continue;
+			var o = document.createElement("option");
+			o.value = it.id;
+			o.textContent = it.n + " (" + KIND[it.t] + ", n° " + it.id + ")";
+			sel.appendChild(o);
+			shown++;
+		}
+	}
+	filterItems();
+</script>
+{% endif %}
+{% endfor %}
+{% endblock %}

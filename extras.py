@@ -229,4 +229,7 @@ def register(app, sessions_module, host, port):
 				pass
 		threading.Thread(target=_open, daemon=True).start()
 
+	import triche
+	triche.register(app, s, same_site)
+
 	return open_browser

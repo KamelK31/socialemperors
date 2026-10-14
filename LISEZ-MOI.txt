@@ -16,6 +16,8 @@ Signaler un bug  cree un fichier dans le dossier "rapports-bugs" : envoie-le a C
                  avec une capture d'ecran
 Qualite          baisse-la si le jeu saccade
 Quitter          enregistre ta partie et arrete le serveur (la fenetre noire se ferme)
+Triche           menu de triche, seulement pour les parties cochees "partie de test"
+                 (ressources, niveau, mana, potions, unites/batiments, attente des quetes)
 
 DANS LE JEU
 -----------
