@@ -4,7 +4,8 @@
 		"ip":								"127.0.0.1",
 		"port":								5050,
 		"write_logs":						false,
-		"allow_save_reloading":				false
+		"allow_save_reloading":				false,
+		"open_browser":						true
 	},
 	"pvp": 
 	{
@@ -44,7 +45,9 @@
 		"graveyard_potions_per_friend":		1,
 		"banned_items":						[],
 		"assign_random_avatars":			false,
-		"no_resource_regeneration_on_owned_land":	true
+		"no_resource_regeneration_on_owned_land":	true,
+		"backup_mirror_dir":				"auto",
+		"harder_quests":					false
 	},
 	"events": 
 	[

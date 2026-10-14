@@ -5,6 +5,7 @@ import traceback
 from datetime import datetime
 from sessions import session, save_session, save_lock
 from op import *
+import journal
 
 CMD_STATUS_OK = 0
 CMD_STATUS_NOT_IMPLEMENTED = 1
@@ -22,16 +23,20 @@ def _OK(player, cmd, args):
 def _NOTOK(player, cmd, args):
 	name = player["playerInfo"]["name"]
 	log.warning(f"[C] FAILED: [{name}] -> {cmd} {args}")
+	journal.command_failed("REFUSE", name, cmd, args)
 	return CMD_STATUS_FAIL
 
 def _ERROR(player, cmd, args, err):
 	name = player["playerInfo"]["name"]
-	log.error(f"[C] CRASH: [{name}] -> {cmd} {args}\n{traceback.format_exc()}")
+	trace = traceback.format_exc()
+	log.error(f"[C] CRASH: [{name}] -> {cmd} {args}\n{trace}")
+	journal.command_failed("PLANTAGE", name, cmd, args, trace)
 	return CMD_STATUS_ERROR
 
 def NOT_IMPLEMENTED(player, cmd, args, gameversion, last_town_id):
 	name = player["playerInfo"]["name"]
 	log.warning(f"[C] UNKNOWN: [{name}] -> {cmd} {args}")
+	journal.command_failed("INCONNU", name, cmd, args)
 	return CMD_STATUS_NOT_IMPLEMENTED
 
 def EXCEPTION(player, cmd, args, gameversion, last_town_id):

@@ -1,0 +1,25 @@
+{% extends "outils_base.html" %}
+{% block title %}Signaler un bug - Social Empires{% endblock %}
+{% block content %}
+{% if done %}
+<div class="card ok">
+	<h1>Rapport cr&eacute;&eacute;</h1>
+	<p>Le fichier est ici (le dossier vient de s'ouvrir) :</p>
+	<p><code>{{ path }}</code></p>
+	<p>Envoie ce fichier &agrave; Claude avec ta capture d'&eacute;cran.</p>
+	<p><a class="btn" href="/bug">Signaler un autre bug</a></p>
+</div>
+{% else %}
+<div class="card">
+	<h1>Signaler un bug</h1>
+	<p>Fais-le juste apr&egrave;s le bug, sans relancer le serveur : le rapport contient ce que le serveur a vu ces derni&egrave;res minutes.</p>
+	<form method="post">
+		<p><b>Qu'est-ce qui s'est pass&eacute; ?</b><br>
+		<span class="muted">Ce que tu faisais, ce que tu attendais, ce qui est arriv&eacute; &agrave; la place.</span></p>
+		<textarea name="description" placeholder="Exemple : j'ai vendu 2 nids de dragon, et apres reconnexion ils sont revenus dans mon inventaire."></textarea>
+		<p><button class="btn main" type="submit">Cr&eacute;er le rapport</button></p>
+	</form>
+	<p class="muted">Le rapport contient : ta description, le journal r&eacute;cent du serveur, le journal des erreurs, les r&eacute;glages du serveur et ta partie. Rien n'est envoy&eacute; sur internet : c'est un fichier sur ton PC.</p>
+</div>
+{% endif %}
+{% endblock %}

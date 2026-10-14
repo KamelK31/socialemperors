@@ -1,0 +1,35 @@
+{% extends "outils_base.html" %}
+{% block title %}Sauvegardes - Social Empires{% endblock %}
+{% block content %}
+{% if message %}<div class="card ok"><p>{{ message }}</p></div>{% endif %}
+{% if error %}<div class="card err"><p>{{ error }}</p></div>{% endif %}
+<div class="card">
+	<h1>Sauvegardes</h1>
+	<p>Une copie de chaque partie est faite toutes les 10 minutes de jeu (les 30 derni&egrave;res sont gard&eacute;es).
+	Restaurer une copie la remet comme partie actuelle ; ta partie actuelle est d'abord copi&eacute;e, donc tu peux toujours revenir en arri&egrave;re.</p>
+	<p class="muted">{% if mirror %}Les copies sont aussi envoy&eacute;es dans <code>{{ mirror }}</code> (en dehors du dossier du jeu).{% else %}Aucun dossier OneDrive trouv&eacute; : les copies restent seulement dans le dossier du jeu.{% endif %}</p>
+	<p class="muted">Si le jeu est ouvert, recharge-le (F5) apr&egrave;s une restauration.</p>
+</div>
+{% for p in players %}
+<div class="card">
+	<h2>{{ p.name }}</h2>
+	<p>Partie actuelle : niveau <b>{{ p.current.level }}</b>, {{ p.current.gold }} or, {{ p.current.cash }} cash, {{ p.current.items }} &eacute;l&eacute;ments sur la carte.
+	<form method="post" action="/sauvegardes/maintenant" style="display: inline;"><input type="hidden" name="uid" value="{{ p.uid }}"><button class="btn" type="submit">Faire une copie maintenant</button></form></p>
+	{% if p.backups %}
+	<div class="scroll"><table>
+		<tr><th>Copie du</th><th class="num">Niveau</th><th class="num">XP</th><th class="num">Or</th><th class="num">Cash</th><th class="num">&Eacute;l&eacute;ments</th><th></th></tr>
+		{% for b in p.backups %}
+		<tr>
+			<td>{{ b.date }}</td><td class="num">{{ b.level }}</td><td class="num">{{ b.xp }}</td><td class="num">{{ b.gold }}</td><td class="num">{{ b.cash }}</td><td class="num">{{ b.items }}</td>
+			<td><form method="post" action="/sauvegardes/restaurer" onsubmit='return confirm({{ ("Remettre la partie " ~ p.name ~ " comme au " ~ b.date ~ " ?") | tojson }});'>
+				<input type="hidden" name="uid" value="{{ p.uid }}"><input type="hidden" name="backup" value="{{ b.name }}">
+				<button class="btn" type="submit">Restaurer</button></form></td>
+		</tr>
+		{% endfor %}
+	</table></div>
+	{% else %}
+	<p class="muted">Pas encore de copie.</p>
+	{% endif %}
+</div>
+{% endfor %}
+{% endblock %}

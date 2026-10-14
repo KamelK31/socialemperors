@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1"/>
+		<title>{% block title %}Social Empires{% endblock %}</title>
+		<link rel="icon" type="image/png" href="/img/icon.gif"/>
+		<style>
+			body { margin: 0; background: #669C2C; font-family: 'lucida grande', tahoma, verdana, arial, sans-serif; font-size: 14px; color: #2b2116; }
+			.page { max-width: 820px; margin: 32px auto; padding: 0 16px; }
+			.logo { display: block; width: 180px; margin: 0 auto 16px; }
+			.card { background: #fffbe0; border: solid 3px #6e5335; border-radius: 8px; padding: 20px 24px; margin-bottom: 16px; }
+			h1 { font-size: 20px; margin: 0 0 12px; }
+			h2 { font-size: 16px; margin: 0 0 8px; }
+			p { line-height: 1.5; margin: 8px 0; }
+			.muted { color: #6e5335; font-size: 12px; }
+			.btn { display: inline-block; font: inherit; font-size: 13px; padding: 5px 12px; color: #2b2116; background: #fff583; border: solid 1.5px #9e7747; border-radius: 5px; cursor: pointer; text-decoration: none; }
+			.btn:hover { background: #faed5a; }
+			.btn.main { background: #89bb0f; color: #fff; border-color: #5d800a; font-weight: bold; }
+			.btn.main:hover { background: #7aa80c; }
+			.ok { background: #e2f4c4; border-color: #5d800a; }
+			.err { background: #fbd9cf; border-color: #a3402a; }
+			table { width: 100%; border-collapse: collapse; font-size: 13px; }
+			th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #e3d6a8; }
+			th { font-size: 12px; color: #6e5335; font-weight: normal; }
+			td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+			textarea { width: 100%; box-sizing: border-box; min-height: 140px; font: inherit; padding: 8px; border: 1.5px solid #9e7747; border-radius: 5px; }
+			code { background: #f3e9c0; padding: 1px 4px; border-radius: 3px; word-break: break-all; }
+			.scroll { overflow-x: auto; }
+		</style>
+	</head>
+	<body>
+		<div class="page">
+			<img class="logo" src="/img/logo.png" alt="Social Empires">
+			{% block content %}{% endblock %}
+			<p class="muted" style="text-align: center;">Version {{ app_version() }}</p>
+		</div>
+	</body>
+</html>

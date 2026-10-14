@@ -34,6 +34,9 @@ def _logging_setup(handle):
 
 _logging_setup(logging.StreamHandler())
 
+import journal
+journal.install_recent_log(log)
+
 log.info(" [+] Loading basics...")
 
 if os.name == 'nt':
@@ -253,33 +256,42 @@ async def similar_05122012_dynamic():
 
 @app.route("/default01.static.socialpointgames.com/static/socialempires/<path:path>")
 async def static_assets_loader(path):
-	# return send_from_directory(ASSETS_DIR, path)
-	if not os.path.exists(ASSETS_DIR + "/"+ path):
-		# File does not exists in provided assets
-		if not os.path.exists(f"{ASSETS_DIR}/../download_assets/assets/{path}"):
-			# Download file from SP's CDN if it doesn't exist
-
-			# Make directory
-			directory = os.path.dirname(f"{ASSETS_DIR}/../download_assets/assets/{path}")
-			if not os.path.exists(directory):
-				os.makedirs(directory)
-
-			# Download File
-			URL = f"https://static.socialpointgames.com/static/socialempires/assets/{path}"
-			try:
-				response = urllib.request.urlretrieve(URL, f"{ASSETS_DIR}/../download_assets/assets/{path}")
-			except (urllib.error.URLError, OSError):	# HTTPError is a URLError; no internet = URLError
-				return ("", 404)
-
-			log.info(f"====== DOWNLOADED ASSET: {URL}")
-			return send_from_directory(f"{ASSETS_DIR}/../download_assets/assets", path)
-		else:
-			# Use downloaded CDN asset
-			log.info(f"====== USING EXTERNAL: download_assets/assets/{path}")
-			return send_from_directory(f"{ASSETS_DIR}/../download_assets/assets", path)
-	else:
+	if os.path.exists(ASSETS_DIR + "/"+ path):
 		# Use provided asset
 		return send_from_directory(ASSETS_DIR, path)
+
+	downloaded_dir = f"{ASSETS_DIR}/../download_assets/assets"
+	if os.path.exists(f"{downloaded_dir}/{path}"):
+		# Use downloaded CDN asset
+		return send_from_directory(downloaded_dir, path)
+
+	# Not here: download it from SP's CDN, unless it failed recently (no internet, or the file is gone
+	# from the CDN): asking again for every missing image slows the game down for nothing.
+	failed_at = _failed_downloads.get(path)
+	if failed_at is not None and timestamp_now() - failed_at < _RETRY_FAILED_DOWNLOAD_SECONDS:
+		return ("", 404)
+
+	target = f"{downloaded_dir}/{path}"
+	URL = f"https://static.socialpointgames.com/static/socialempires/assets/{path}"
+	try:
+		with urllib.request.urlopen(URL, timeout=15) as response:
+			data = response.read()
+	except Exception:	# HTTPError is a URLError; no internet = URLError; timeout = socket.timeout
+		_failed_downloads[path] = timestamp_now()
+		log.info(f"====== ASSET NOT AVAILABLE (retried in 1h): {URL}")
+		return ("", 404)
+
+	# written whole then renamed: an interrupted download never leaves a broken file behind
+	os.makedirs(os.path.dirname(target), exist_ok=True)
+	with open(target + ".part", "wb") as f:
+		f.write(data)
+	os.replace(target + ".part", target)
+	_failed_downloads.pop(path, None)
+	log.info(f"====== DOWNLOADED ASSET: {URL}")
+	return send_from_directory(downloaded_dir, path)
+
+_failed_downloads = {}		# asset path -> time of the last failed download
+_RETRY_FAILED_DOWNLOAD_SECONDS = 3600
 
 ## GAME DYNAMIC
 
@@ -643,6 +655,7 @@ async def sync_error_track_response():
 	user_id = request.values['user_id']
 
 	#log.info(f"sync_error_track: USERID: {USERID}. [Error: {error}] tries: {tries}. --", request.values)
+	journal.write("JEU", USERID, f"erreur de synchronisation: {error}", f"essai {tries}, echec {current_failed} (avant {previous_failed}) : {description}")
 	return ("", 200)
 
 @app.route("/null")
@@ -796,6 +809,18 @@ async def clean_assaults():
 	return await _api_not_implemented(request, "tournaments/clean_assaults.php")
 
 
+@app.errorhandler(500)
+def server_error(e):
+	import traceback
+	original = getattr(e, "original_exception", None) or e
+	trace = "".join(traceback.format_exception(type(original), original, original.__traceback__))
+	journal.write("PLANTAGE", request.values.get("USERID", "?"), f"page {request.path}", trace)
+	log.error(f"500 on {request.path}\n{trace}")
+	return ("", 500)
+
+import extras
+open_browser = extras.register(app, __import__("sessions"), host, port)
+
 ########
 # MAIN #
 ########
@@ -807,5 +832,6 @@ if __name__ == '__main__':
 	# TODO: post to console this after running the app
 	if logging.getLogger('werkzeug').disabled:
 		log.info(f" * Running on http://{host}:{port}")
-	app.run(host=host, port=port, debug=False)
+	open_browser()
+	app.run(host=host, port=port, debug=False, threaded=True)
 	

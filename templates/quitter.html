@@ -1,0 +1,15 @@
+{% extends "outils_base.html" %}
+{% block title %}Quitter - Social Empires{% endblock %}
+{% block content %}
+<div class="card {% if done %}ok{% endif %}">
+	{% if done %}
+	<h1>C'est enregistr&eacute;</h1>
+	<p>Ta partie est sauvegard&eacute;e et le serveur s'est arr&ecirc;t&eacute;. Tu peux fermer cet onglet.</p>
+	<p class="muted">Pour rejouer : double-clique sur &laquo; JOUER &raquo;.</p>
+	{% else %}
+	<h1>Quitter le jeu</h1>
+	<p>Ferme d'abord l'onglet du jeu, puis clique ici : ta partie est enregistr&eacute;e et le serveur s'arr&ecirc;te.</p>
+	<form method="post"><button class="btn main" type="submit">Enregistrer et arr&ecirc;ter le serveur</button></form>
+	{% endif %}
+</div>
+{% endblock %}

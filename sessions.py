@@ -927,6 +927,82 @@ def backup_session(USERID: str, force: bool = False):
 				os.remove(os.path.join(backup_dir, old))
 			except OSError:
 				pass
+		_mirror_backup(USERID, os.path.join(backup_dir, name), name)
+
+def mirror_dir():
+	"""Folder outside the game folder (OneDrive by default) that gets a copy of every dated backup,
+	so a game can be recovered if this PC is lost. None when there is no such folder."""
+	configured = get_server_config().get("misc", {}).get("backup_mirror_dir", "auto")
+	if configured in (None, "", False, "off"):
+		return None
+	if configured == "auto":
+		onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
+		if not onedrive or not os.path.isdir(onedrive):
+			return None
+		return os.path.join(onedrive, "Social Empires - sauvegardes")
+	return configured
+
+def _mirror_backup(USERID: str, source: str, name: str):
+	target_root = mirror_dir()
+	if target_root is None:
+		return
+	try:
+		save = session(USERID)
+		label = re.sub(r'[^A-Za-z0-9 _-]', '', str(save["playerInfo"]["name"]))[:30].strip() if save else ""
+		target = os.path.join(target_root, f"{label} ({USERID})" if label else str(USERID))
+		os.makedirs(target, exist_ok=True)
+		shutil.copy2(source, os.path.join(target, name))
+		copies = sorted(b for b in os.listdir(target) if b.endswith(".save.json"))
+		for old in copies[:-BACKUPS_TO_KEEP]:
+			try:
+				os.remove(os.path.join(target, old))
+			except OSError:
+				pass
+	except OSError as e:
+		log.warning(f" * Copy of the backup to {target_root} failed: {e}")
+
+def list_backups(USERID: str):
+	"Dated backups of a player, newest first: [(file name, save)]. Unreadable files are skipped."
+	backup_dir = os.path.join(BACKUPS_DIR, str(USERID))
+	result = []
+	if os.path.isdir(backup_dir):
+		for name in sorted((b for b in os.listdir(backup_dir) if b.endswith(".save.json")), reverse=True):
+			save = _read_save_file(os.path.join(backup_dir, name))
+			if save is not None:
+				result.append((name, save))
+	return result
+
+def restore_backup(USERID: str, name: str):
+	"""Puts a dated backup back as the current game. The current game is backed up first, so a
+	restore can itself be undone. Returns True if it was restored."""
+	if not re.fullmatch(r'[0-9-]+\.save\.json', name):
+		return False
+	with save_lock:
+		current = session(USERID)
+		if current is None:
+			return False
+		backup = _read_save_file(os.path.join(BACKUPS_DIR, str(USERID), name))
+		if backup is None or str(backup["playerInfo"]["pid"]) != str(USERID):
+			return False
+		backup_session(USERID, force=True)
+		# same object kept: every part of the server that holds the save sees the restored game
+		current.clear()
+		current.update(backup)
+		migrate_loaded_save(current)
+		if USERID in __pvp_data:
+			try:
+				pvp_data_update(USERID, current)
+			except (KeyError, IndexError):
+				pass
+		save_session(USERID, False)
+		log.info(f" * Game of {USERID} restored from backup {name}")
+		return True
+
+def save_all_sessions():
+	"Writes every player's game to disk (before the server stops)."
+	with save_lock:
+		for USERID in list(__saves.keys()):
+			save_session(USERID, False)
 
 def save_session(USERID, write_ts = True):
 	file = f"{USERID}.save.json"

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 	<head>
 		<!-- Meta -->
 		<meta charset="utf-8"/>
@@ -8,15 +8,15 @@
 		<link rel="shortcut icon" href="/img/icon.gif"/>
 		<link rel="icon" type="image/png" href="/img/icon.gif"/>
 		<script src="/js/external_interface.js"></script>
-		<script src="https://unpkg.com/@ruffle-rs/ruffle/ruffle.js"></script>
-		<!--<script src="https://cdn.jsdelivr.net/npm/@ruffle-rs/ruffle/ruffle.js"></script>-->
+		<!-- Ruffle 0.7.1 shipped with the game in templates/ruffle: no internet needed, and an update of Ruffle can't break the game -->
+		<script src="/ruffle/ruffle.js"></script>
 	</head>
 	<body style="font-family: 'lucida grande',tahoma,verdana,arial,sans-serif">
 	<center>
 		<!-- SESSION HEADER -->
 		<div id="header" style="width: 760px; margin-top: 50px;">
 			<div id="session" style="float: right;">
-				<p style="display:inline">Logged in as <b>{{save_info.name}}</b> lvl {{save_info.level}} (<a href="/">logout</a>)</p>
+				<p style="display:inline">Partie : <b>{{save_info.name}}</b> niveau {{save_info.level}} (<a href="/">changer de partie</a>)</p>
 			</div>
 		</div>
 		<br>
@@ -33,12 +33,18 @@
 			<!-- GAME BAR BUTTONS -->
 			<div id="gamebar_buttons" style="width: 760px;">
 				&nbsp;
-				<a class="gameBarButton" href="#"><div><img src="/img/gift.png">Free Gifts</div></a>
-				<a class="gameBarButton gameBarButtonSelected" href="#"><div><img>Play</div></a>
-				<a class="gameBarButton" href="#"><div><img src="/img/cash.png">Get Cash</div></a>
-				<a class="gameBarButton" href="https://discord.gg/zW5gSbQJBw" target="_blank"><div><img src="/img/discord.png">Discord</div></a>
-				<a class="gameBarButton" href="https://github.com/AcidCaos/socialemperors#readme" target="_blank"><div><img src="/img/github.png">GitHub</div></a>
+				<a class="gameBarButton gameBarButtonSelected" href="#"><div>Jeu</div></a>
 				<a class="gameBarButton" href="#" onclick="gameFullscreen(); return false;" title="Plein ecran (Echap pour quitter)"><div>&#x26F6; Plein &eacute;cran</div></a>
+				<a class="gameBarButton" href="/sauvegardes" target="_blank" title="Tes copies de secours, restaurer une ancienne partie"><div>Sauvegardes</div></a>
+				<a class="gameBarButton" href="/bug" target="_blank" title="Cree un rapport a envoyer pour corriger un bug"><div>Signaler un bug</div></a>
+				<span class="gameBarButton" title="Qualite d'image : baisse-la si le jeu saccade"><div>Qualit&eacute;
+					<select id="quality" onchange="setQuality(this.value)" style="font-size: 9pt; border: none; background: transparent;">
+						<option value="best">Maximale</option>
+						<option value="high">Haute</option>
+						<option value="medium">Moyenne</option>
+						<option value="low">Basse</option>
+					</select></div></span>
+				<a class="gameBarButton" href="#" onclick="quitGame(); return false;" title="Enregistre ta partie et arrete le serveur"><div>Quitter</div></a>
 			</div>
 			<style>
 				#gameBar {
@@ -96,6 +102,15 @@
 				#game_wrap:fullscreen #ruffle { line-height: 0; }
 			</style>
 			<script>
+				// Image quality chosen in the game bar, remembered by this browser
+				var gameQuality = "high";
+				try { gameQuality = localStorage.getItem("se_quality") || "high"; } catch (e) {}
+				document.getElementById("quality").value = gameQuality;
+				function setQuality(q) {
+					try { localStorage.setItem("se_quality", q); } catch (e) {}
+					location.reload();
+				}
+
 				var ruffle = window.RufflePlayer.newest(),
 				player = Object.assign(document.getElementById("ruffle").appendChild(ruffle.createPlayer()), {
 					width: 760,
@@ -103,11 +118,16 @@
 					style: 'width: 760px; height: 600px; background-color: #669C2C;',
 				});
 				player.load({ // https://ruffle.rs/js-docs/master/interfaces/URLLoadOptions.html
-					url: "http://{{SERVERIP}}:{{PORT}}/default01.static.socialpointgames.com/static/socialempires/flash/SELoader.swf?swftoload=http://{{SERVERIP}}:{{PORT}}/default01.static.socialpointgames.com/static/socialempires/flash/{{GAMEVERSION}}",
+					// ?v= changes when the file changes: the browser never keeps an old copy of a corrected game file
+					url: "http://{{SERVERIP}}:{{PORT}}/default01.static.socialpointgames.com/static/socialempires/flash/SELoader.swf?v={{ asset_version('SELoader.swf') }}&swftoload=" + encodeURIComponent("http://{{SERVERIP}}:{{PORT}}/default01.static.socialpointgames.com/static/socialempires/flash/{{GAMEVERSION}}?v={{ asset_version(GAMEVERSION) }}"),
 					backgroundColor: "#669C2C",
 					allowScriptAccess: false,
 					allowFullscreen: false,	// the game's own full screen mode lays out badly in Ruffle: use the page's "Plein ecran" button
 					autoplay: true,
+					quality: gameQuality,
+					logLevel: "error",
+					warnOnUnsupportedContent: false,
+					upgradeToHttps: false,
 					
 					parameters: 'spdebug=notnull&brk=0\
 						&staticUrl=http://{{SERVERIP}}:{{PORT}}/default01.static.socialpointgames.com/static/socialempires/&brk=0\
@@ -167,10 +187,30 @@
 					if (document.fullscreenElement) { document.exitFullscreen(); return; }
 					if (gameWrap.requestFullscreen) { gameWrap.requestFullscreen(); }
 				}
+				// Quit: the game sends its last actions to the server every few seconds, so wait for them,
+				// then the server writes every game and stops.
+				function quitGame() {
+					if (document.fullscreenElement) { document.exitFullscreen(); }
+					var box = document.getElementById("quit_box"), left = 5;
+					box.style.display = "flex";
+					var timer = setInterval(function () {
+						left -= 1;
+						document.getElementById("quit_left").textContent = left;
+						if (left <= 0) { clearInterval(timer); document.getElementById("quit_form").submit(); }
+					}, 1000);
+				}
+
 				document.addEventListener("fullscreenchange", fitGame);
 				window.addEventListener("resize", fitGame);
 			</script>
 		</object>
 	</center>
+	<form id="quit_form" method="post" action="/quitter"></form>
+	<div id="quit_box" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 10;">
+		<div style="background: #fff583; border: solid 3px #6e5335; border-radius: 8px; padding: 24px 32px; font-size: 14pt; text-align: center;">
+			Enregistrement de ta partie&hellip; <b id="quit_left">5</b><br>
+			<span style="font-size: 10pt;">Le serveur s'arr&ecirc;tera tout seul.</span>
+		</div>
+	</div>
 	</body>
 </html>

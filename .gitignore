@@ -16,4 +16,9 @@ download_assets/
 Include/
 Lib/
 Scripts/
-pyvenv.cfg
+pyvenv.cfgrapports-bugs/
+journal-erreurs*.txt
+ancienne-version/
+version-installee.json
+python/
+*.part
