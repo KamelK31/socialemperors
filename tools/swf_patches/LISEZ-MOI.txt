@@ -1,0 +1,11 @@
+Sources des classes modifiees dans assets/flash/SocialEmpires1.4.07sec_fixed.swf
+(decompilees avec JPEXS ffdec 24.1.1, modifiees, puis remises avec :
+ java -jar ffdec-cli.jar -replace in.swf out.swf <Classe> <Fichier.as>)
+
+GUI.AnimatedUnit          Soul Mixer : l'unite proposee ne s'affiche plus en double
+GUI.GiftButtonLarge       Entrepot : "Sell" sur un objet en plusieurs exemplaires propose de tout vendre
+                          (Yes = tout vendre, No = en vendre un seul). Meme prix et memes commandes
+                          que de les vendre un par un.
+GUI.PortraitSpecialAttack Touches 1 a 9 : lancent les attaques speciales de l'unite selectionnee
+                          (1 = en haut a gauche, 2 = en haut a droite, 3 = en bas a gauche, 4 = en bas a droite).
+                          Les secondes restantes avant de pouvoir relancer s'affichent sur les attaques.
