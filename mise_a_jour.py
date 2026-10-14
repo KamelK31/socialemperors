@@ -164,8 +164,8 @@ def main():
 			print("Demande a Claude de les integrer, puis relance cette mise a jour.")
 		else:
 			print("\nRien de nouveau chez Nerroth.")
-	except Exception:
-		pass
+	except Exception as e:
+		print(f"\n(Impossible de verifier les nouveautes de Nerroth : {e})")
 	return 0
 
 
