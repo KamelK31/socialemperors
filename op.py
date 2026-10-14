@@ -148,6 +148,10 @@ def cmd_sell(player, cmd, args, gameversion, last_town_id):
 	resurrectable = False
 	if reason == "KILL":
 		resurrectable = True
+		# args[6] = the client's checkPutToGraveyard(): 0 for summoned units, peasants, animals and a
+		# Blue Phoenix that will be reborn from its egg. Heroes return 0 too, but go to deadHeroes.
+		if len(args) > 6 and str(args[6]) == "0" and item_id not in resurrectable_heroes:
+			resurrectable = False
 	
 	_map = player["maps"][town_id]
 	item = get_item_from_id(item_id)
@@ -508,10 +512,8 @@ def cmd_push_queue_unit(player, cmd, args, gameversion, last_town_id):
 		costs = {}
 		costs[cost_type] = cost
 		
-		cost_food = 0
-		if cost_type != "f":
-			cost_food = cost << 1			# x2 food
-			costs["f"] = cost_food
+		cost_food = training_food_cost(item_data, cost)
+		costs["f"] = costs.get("f", 0) + cost_food
 
 		refund_res = pay_resource_type(player, _map, cost_type, cost)
 
@@ -597,7 +599,7 @@ def cmd_unqueue_unit(player, cmd, args, gameversion, last_town_id):
 		item_data = get_item_from_id(unit_id)
 		cost = get_training_cost(item_data, _map)
 		cost_type = item_data["cost_type"]
-		cost_food = cost << 1			# x2 food
+		cost_food = training_food_cost(item_data, cost)
 
 		give_resource_type(player, _map, cost_type, cost)
 		give_resource_type(player, _map, "f", cost_food)
@@ -1070,6 +1072,31 @@ def cmd_set_info_showed(player, cmd, args, gameversion, last_town_id):
 		privateState["infoShowed"] = {}		# old saves have []
 	privateState["infoShowed"][key] = showed
 
+	return True
+
+def training_food_cost(item_data, cost):
+	# BuildingQueueManager: food = ceil(cost * FOOD_PER_GOLD_INTRAINING (2)), peasants train for free food
+	if int(item_data["subcat_functional"]) == Constant.SUBCATFUNC_UNIT_PEASANT:
+		return 0
+	return int(math.ceil(cost * 2))
+
+def cmd_gold_statue_conversion(player, cmd, args, gameversion, last_town_id):
+	# gold (IsoGoldenDynastyDragon.convertToGoldOnce: GOLD_PER_STATUE = 10)
+	# The game also drops a gold token, but picking it up only updates the screen: this command
+	# is the only time the server hears about that gold.
+	gold = int(args[0])
+	if gold < 0 or gold > 10:
+		return False
+
+	_map = player["maps"][last_town_id]
+	add_map_currency(_map, "coins", gold)
+
+	return True
+
+def cmd_put_graveyard(player, cmd, args, gameversion, last_town_id):
+	# unit_id (PhoenixEggDelegate: the egg died before hatching, the phoenix goes to the graveyard)
+	item_id = int(args[0])
+	try_push_graveyard(player, item_id)
 	return True
 
 def cmd_set_strategy(player, cmd, args, gameversion, last_town_id):

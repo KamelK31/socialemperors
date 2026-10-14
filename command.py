@@ -150,6 +150,8 @@ commands = {
 	"name_map":							cmd_name_map,
 	"buy_map":							cmd_buy_map,
 	"set_strategy":						cmd_set_strategy,
+	"gold_statue_conversion":			cmd_gold_statue_conversion,
+	"put_graveyard":					cmd_put_graveyard,
 	"set_info_showed":					cmd_set_info_showed,
 	"exchange_cash_new":				cmd_exchange_cash,
 	"complete_tutorial":				cmd_complete_tutorial,
