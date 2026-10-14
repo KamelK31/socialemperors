@@ -1,0 +1,53 @@
+SOCIAL EMPIRES - TA VERSION (base Nerroth + corrections)
+========================================================
+
+JOUER
+-----
+Double-clique sur "Social Empires" sur ton Bureau (ou sur "JOUER (nerroth).bat" dans ce dossier).
+Le jeu s'ouvre tout seul dans ton navigateur, sur ta derniere partie.
+Pour changer de partie : lien "changer de partie" en haut a droite du jeu.
+
+BOUTONS AU-DESSUS DU JEU
+------------------------
+Plein ecran      le jeu en grand (Echap pour sortir)
+Sauvegardes      tes copies de secours ; "Restaurer" remet une ancienne copie
+                 (ta partie actuelle est copiee avant, tu peux toujours revenir)
+Signaler un bug  cree un fichier dans le dossier "rapports-bugs" : envoie-le a Claude
+                 avec une capture d'ecran
+Qualite          baisse-la si le jeu saccade
+Quitter          enregistre ta partie et arrete le serveur (la fenetre noire se ferme)
+
+DANS LE JEU
+-----------
+Entrepot : "Sell" sur un objet en plusieurs exemplaires -> Yes = tout vendre, No = un seul.
+Unites speciales : touches 1, 2, 3, 4 pour leurs attaques speciales
+(1 = en haut a gauche, 2 = en haut a droite, 3 = en bas a gauche, 4 = en bas a droite).
+Les secondes avant de pouvoir relancer une attaque s'affichent dessus.
+
+TES SAUVEGARDES
+---------------
+saves\<id>.save.json        ta partie
+saves\backups\<id>\         une copie toutes les 10 minutes de jeu (30 gardees)
+OneDrive\Social Empires - sauvegardes\   les memes copies, en dehors du PC (si OneDrive est actif)
+Si une sauvegarde est abimee, le serveur reprend tout seul la plus recente.
+
+REGLAGES (server_config.json, section "misc")
+---------------------------------------------
+"no_resource_regeneration_on_owned_land": true   les pierres/or recoltes sur tes terres ne reviennent pas
+"harder_quests": false                           mets true pour des iles de quetes plus difficiles
+"backup_mirror_dir": "auto"                      dossier des copies hors PC ("auto" = OneDrive, "off" = aucun)
+Relance le serveur apres un changement.
+
+MISE A JOUR
+-----------
+Serveur ferme, double-clique sur "METTRE A JOUR.bat".
+Tes parties et tes reglages ne sont jamais ecrases ; les anciens fichiers vont dans "ancienne-version".
+Il te dit aussi si Nerroth a publie des nouveautes a integrer (demande-le a Claude).
+
+EN CAS DE PROBLEME
+------------------
+journal-erreurs.txt   la liste des actions que le serveur a refusees (et pourquoi le jeu a recharge)
+
+CODE SOURCE
+-----------
+https://github.com/KamelK31/socialemperors (branche "mon-jeu")
