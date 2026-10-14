@@ -5,6 +5,13 @@ from sessions import session, save_session, save_lock
 from get_game_config import get_game_config, get_level_from_xp, get_name_from_item_id, get_attribute_from_mission_id, get_xp_from_level, get_attribute_from_item_id, get_item_from_subcat_functional
 from constants import Constant
 from engine import apply_cost, apply_collect, apply_collect_xp, timestamp_now
+from cmd_helpers import _store, _store_add, _store_take, _gift_take, _remove_map_item
+from handlers_extra import EXTRA_HANDLERS
+from handlers_buildings import _collections
+
+# Heroes that go to the graveyard when they die (IsoFightingElement.checkPutToGraveyard):
+# Ranger, Xena, Arthur, Merlin, Valkiria, Wallace, Thor, High Elf
+GRAVEYARD_HEROES = (535, 533, 534, 550, 554, 555, 556, 557)
 
 def get_strategy_type(id):
     if id == 8:
@@ -16,47 +23,6 @@ def get_strategy_type(id):
     if id == 10:
         return "Aggressive"
     return "Unknown Strategy"
-
-def _store(map: dict) -> dict:
-    "Items stored in the map's inventory (not gifts). The game reads it as map.store = {item_id: count}."
-    store = map.get("store")
-    if not isinstance(store, dict):
-        store = {}
-        map["store"] = store
-    return store
-
-def _store_add(map: dict, item_id, count: int = 1) -> None:
-    store = _store(map)
-    key = str(item_id)
-    store[key] = int(store.get(key, 0)) + count
-
-def _store_take(map: dict, item_id) -> bool:
-    "Removes one item from the stored inventory. Returns False if there was none."
-    store = _store(map)
-    key = str(item_id)
-    if int(store.get(key, 0)) <= 0:
-        return False
-    store[key] = int(store[key]) - 1
-    if store[key] <= 0:
-        del store[key]
-    return True
-
-def _gift_take(save: dict, item_id) -> bool:
-    "Removes one item from the gifts inventory. Returns False if there was none."
-    gifts = save["privateState"]["gifts"]
-    if not (isinstance(item_id, int) and 0 <= item_id < len(gifts) and gifts[item_id] > 0):
-        return False
-    gifts[item_id] -= 1
-    while len(gifts) != 0 and gifts[-1] == 0:
-        gifts.pop()
-    return True
-
-def _remove_map_item(map: dict, item_id, x, y) -> bool:
-    for item in map["items"]:
-        if item[0] == item_id and item[1] == x and item[2] == y:
-            map["items"].remove(item)
-            return True
-    return False
 
 def command(USERID, data):
     timestamp = data["ts"]
@@ -165,8 +131,13 @@ def do_command(USERID, cmd, args):
             price_multiplier = -0.05
             if get_attribute_from_item_id(id, "cost_type") != "c":
                 apply_cost(save["playerInfo"], save["maps"][town_id], id, price_multiplier)
-        if reason == 'KILL':
-            pass # TODO : add to graveyard
+        if reason == 'KILL' and id in GRAVEYARD_HEROES:
+            # the hero died: the game shows it in the graveyard (privateState.deadHeroes = {unit_id: count})
+            dead = save["privateState"].get("deadHeroes")
+            if not isinstance(dead, dict):
+                dead = {}
+                save["privateState"]["deadHeroes"] = dead
+            dead[str(id)] = int(dead.get(str(id), 0)) + 1
     
     elif cmd == Constant.CMD_KILL:
         x = args[0]
@@ -551,7 +522,17 @@ def do_command(USERID, cmd, args):
             quantity = 1
             save["privateState"]["potion"] = max(int(save["privateState"]["potion"] - quantity), 0)
         else:
-            pass # TODO 
+            # PopupResurrectHeroes: costs cost_unit_cash * RESURRECT_MULTIPLIER (500) gold, gives the unit's xp
+            hero_map = save["maps"][town_id]
+            price = int(get_attribute_from_item_id(unit_id, "cost_unit_cash") or 0) * 500
+            hero_map["coins"] = max(int(hero_map["coins"]) - price, 0)
+            hero_map["xp"] = int(hero_map["xp"]) + int(get_attribute_from_item_id(unit_id, "xp") or 0)
+        # remove the hero from the graveyard (privateState.deadHeroes = {unit_id: count})
+        dead = save["privateState"].get("deadHeroes")
+        if isinstance(dead, dict) and int(dead.get(str(unit_id), 0)) > 0:
+            dead[str(unit_id)] = int(dead[str(unit_id)]) - 1
+            if dead[str(unit_id)] <= 0:
+                del dead[str(unit_id)]
         # Place unit
         collected_at_timestamp = timestamp_now()
         level = 0 # TODO 
@@ -635,9 +616,17 @@ def do_command(USERID, cmd, args):
         print(f"Village quest won: +{gold} gold, +{xp} xp, +{food} food, +{stone} stone. Next quest: {next_quest_id}")
 
     elif cmd == Constant.CMD_ADD_COLLECTABLE:
-        collection_id = args[0]
-        collectible_id = args[1]
-        # TODO 
+        # privateState.collections[collection] = [completed 0/1, count of piece 1, ..., count of piece 5]
+        collection_id = int(args[0])
+        collectible_id = int(args[1])
+        if not 1 <= collectible_id <= 5:
+            raise ValueError(f"bad collectible {collectible_id}")
+        collection = _collections(save)[collection_id]
+        collection[collectible_id] = int(collection[collectible_id]) + 1
+        print(f"Collection {collection_id}: piece {collectible_id} found ({collection[collectible_id]})")
+
+    elif cmd in EXTRA_HANDLERS:
+        EXTRA_HANDLERS[cmd](save, args)
 
     else:
         print(f"Unhandled command '{cmd}' -> args", args)

@@ -5,6 +5,14 @@ def get_player_info(USERID):
     # Update last logged in
     ts_now = timestamp_now()
     session(USERID)["playerInfo"]["last_logged_in"] = ts_now
+    # The island selector reads privateState.maps (race of each island); older saves don't have it.
+    save = session(USERID)
+    towns = save["privateState"].get("maps")
+    if not isinstance(towns, list) or len(towns) < len(save["maps"]):
+        towns = towns if isinstance(towns, list) else []
+        while len(towns) < len(save["maps"]):
+            towns.append({"r": save["maps"][len(towns)].get("race", "h")})
+        save["privateState"]["maps"] = towns
     # player
     player_info = {
         "result": "ok",
