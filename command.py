@@ -1,6 +1,7 @@
 import json
+import traceback
 
-from sessions import session, save_session
+from sessions import session, save_session, save_lock
 from get_game_config import get_game_config, get_level_from_xp, get_name_from_item_id, get_attribute_from_mission_id, get_xp_from_level, get_attribute_from_item_id, get_item_from_subcat_functional
 from constants import Constant
 from engine import apply_cost, apply_collect, apply_collect_xp, timestamp_now
@@ -16,6 +17,47 @@ def get_strategy_type(id):
         return "Aggressive"
     return "Unknown Strategy"
 
+def _store(map: dict) -> dict:
+    "Items stored in the map's inventory (not gifts). The game reads it as map.store = {item_id: count}."
+    store = map.get("store")
+    if not isinstance(store, dict):
+        store = {}
+        map["store"] = store
+    return store
+
+def _store_add(map: dict, item_id, count: int = 1) -> None:
+    store = _store(map)
+    key = str(item_id)
+    store[key] = int(store.get(key, 0)) + count
+
+def _store_take(map: dict, item_id) -> bool:
+    "Removes one item from the stored inventory. Returns False if there was none."
+    store = _store(map)
+    key = str(item_id)
+    if int(store.get(key, 0)) <= 0:
+        return False
+    store[key] = int(store[key]) - 1
+    if store[key] <= 0:
+        del store[key]
+    return True
+
+def _gift_take(save: dict, item_id) -> bool:
+    "Removes one item from the gifts inventory. Returns False if there was none."
+    gifts = save["privateState"]["gifts"]
+    if not (isinstance(item_id, int) and 0 <= item_id < len(gifts) and gifts[item_id] > 0):
+        return False
+    gifts[item_id] -= 1
+    while len(gifts) != 0 and gifts[-1] == 0:
+        gifts.pop()
+    return True
+
+def _remove_map_item(map: dict, item_id, x, y) -> bool:
+    for item in map["items"]:
+        if item[0] == item_id and item[1] == x and item[2] == y:
+            map["items"].remove(item)
+            return True
+    return False
+
 def command(USERID, data):
     timestamp = data["ts"]
     first_number = data["first_number"]
@@ -24,11 +66,22 @@ def command(USERID, data):
     publishActions = data["publishActions"]
     commands = data["commands"]
     
-    for i, comm in enumerate(commands):
-        cmd = comm["cmd"]
-        args = comm["args"]
-        do_command(USERID, cmd, args)
-    save_session(USERID) # Save session
+    with save_lock:
+        if session(USERID) is None:
+            print(f" [!] Commands received for unknown village '{USERID}', ignored.")
+            return
+        try:
+            for i, comm in enumerate(commands):
+                cmd = comm["cmd"]
+                args = comm["args"]
+                # A command that fails must not stop the others, nor the save below.
+                try:
+                    do_command(USERID, cmd, args)
+                except Exception:
+                    print(f"\n [!] ERROR while handling command '{cmd}' {args}. It was skipped, the rest is saved.")
+                    traceback.print_exc()
+        finally:
+            save_session(USERID) # Save session, always
 
 def do_command(USERID, cmd, args):
     save = session(USERID)
@@ -185,7 +238,8 @@ def do_command(USERID, cmd, args):
             if item[1] == b_x and item[2] == b_y:
                 if len(item) < 7:
                     break
-                item[6].remove(unit_id)
+                if unit_id in item[6]:
+                    item[6].remove(unit_id)
                 break
         if place_popped_unit:
             # Spawn unit outside
@@ -242,49 +296,78 @@ def do_command(USERID, cmd, args):
         save["playerInfo"]["cash"] = max(save["playerInfo"]["cash"] - 5, 0)#maybe make function for editing resources
         save["maps"][town_id]["coins"] += 2500
 
-    elif cmd == Constant.CMD_STORE_ITEM:
+    elif cmd == Constant.CMD_STORE_ITEM or cmd == Constant.CMD_STORE_ITEM_FROMBUG:
+        # store_item: the player puts a building in the inventory.
+        # store_item_frombug: the game found items piled on the same tile when loading the map
+        # and moved the extra ones to the inventory.
         x = args[0]
         y = args[1]
         town_id = int(args[2])
         item_id = args[3]
-        print("Store", str(get_name_from_item_id(item_id)), "from", f"({x},{y})")
+        print("Store", str(get_name_from_item_id(item_id)), "from", f"({x},{y})", "(colliding item)" if cmd == Constant.CMD_STORE_ITEM_FROMBUG else "")
         map = save["maps"][town_id]
-        for item in map["items"]:
-            if item[0] == item_id and item[1] == x and item[2] == y:
-                map["items"].remove(item)
-                break
-        length = len(save["privateState"]["gifts"])
-        if length <= item_id:
-            for i in range(item_id - length + 1):
-                save["privateState"]["gifts"].append(0)
-        save["privateState"]["gifts"][item_id] += 1
+        _remove_map_item(map, item_id, x, y)
+        _store_add(map, item_id)
+
+    elif cmd == Constant.CMD_STORE_ADD_ITEMS:
+        # Rewards (darts, heroes, quests...) sent straight to the inventory
+        item_ids = json.loads(args[0]) if isinstance(args[0], str) else args[0]
+        town_id = int(args[1]) if len(args) > 1 else 0
+        map = save["maps"][town_id]
+        for item_id in item_ids:
+            _store_add(map, int(item_id))
+        print("Added to inventory:", ", ".join(str(get_name_from_item_id(int(i))) for i in item_ids))
+
+    elif cmd == Constant.CMD_SELL_STORED:
+        item_id = args[0]
+        town_id = int(args[1])
+        print("Stored item", str(get_name_from_item_id(item_id)), "sold on town:", town_id)
+        map = save["maps"][town_id]
+        if not _store_take(map, item_id):
+            _gift_take(save, item_id) # stored by an older version of the server
+        price_multiplier = -0.05
+        if get_attribute_from_item_id(item_id, "cost_type") != "c":
+            apply_cost(save["playerInfo"], map, item_id, price_multiplier)
+
+    elif cmd == Constant.CMD_PLACE_STORED_ITEM:
+        item_id = args[0]
+        x = args[1]
+        y = args[2]
+        frame = args[3]
+        town_id = int(args[4]) if len(args) > 4 else 0
+        print("Place stored", str(get_name_from_item_id(item_id)), "at", f"({x},{y})")
+        map = save["maps"][town_id]
+        if not _store_take(map, item_id):
+            _gift_take(save, item_id) # stored by an older version of the server
+        map["items"] += [[item_id, x, y, 0, timestamp_now(), 0]]
 
     elif cmd == Constant.CMD_PLACE_GIFT:
         item_id = args[0]
         x = args[1]
         y = args[2]
-        town_id = args[3]#unsure, both 3 and 4 seem to stay 0
-        args[4]#unknown yet
+        frame = args[3]
+        town_id = int(args[4]) if len(args) > 4 else 0 # game sends [id, x, y, frame, townID]
         print("Add", str(get_name_from_item_id(item_id)), "at", f"({x},{y})")
         items = save["maps"][town_id]["items"]
         orientation = 0#TODO
         collected_at_timestamp = timestamp_now()
         level = 0
         items += [[item_id, x, y, orientation, collected_at_timestamp, level]]#maybe make function for adding items
-        save["privateState"]["gifts"][item_id] -= 1
-        if save["privateState"]["gifts"][item_id] == 0: #removes excess zeros at end if necessary
-            while(save["privateState"]["gifts"][-1] == 0):
-                save["privateState"]["gifts"].pop()  
+        gifts = save["privateState"]["gifts"]
+        if item_id < len(gifts) and gifts[item_id] > 0:
+            gifts[item_id] -= 1
+        while len(gifts) != 0 and gifts[-1] == 0: #removes excess zeros at end if necessary
+            gifts.pop()
 
     elif cmd == Constant.CMD_SELL_GIFT:
         item_id = args[0]
         town_id = args[1]
         print("Gift", str(get_name_from_item_id(item_id)), "sold on town:",town_id)
         gifts = save["privateState"]["gifts"]
-        gifts[item_id] -= 1
-        if gifts[item_id] == 0: #removes excess zeros at end if necessary
-            while(len(gifts) != 0 and gifts[-1] == 0):
-                gifts.pop()
+        if item_id < len(gifts) and gifts[item_id] > 0:
+            gifts[item_id] -= 1
+        while len(gifts) != 0 and gifts[-1] == 0: #removes excess zeros at end if necessary
+            gifts.pop()
         price_multiplier = -0.05
         if get_attribute_from_item_id(item_id, "cost_type") != "c":
             apply_cost(save["playerInfo"], save["maps"][town_id], item_id, price_multiplier)
@@ -387,7 +470,8 @@ def do_command(USERID, cmd, args):
         pState = save["privateState"]
         pState["monsterNestActive"] = 0
         pState["stepMonsterNumber"] = 0
-        pState["MonsterNumber"] = 0
+        pState["monsterNumber"] = 0
+        pState.pop("MonsterNumber", None) # remove the wrong key written by older versions
         pState["timeStampTakeCareMonster"] = -1 # remove timer if any
 
 
@@ -472,7 +556,8 @@ def do_command(USERID, cmd, args):
         collected_at_timestamp = timestamp_now()
         level = 0 # TODO 
         orientation = 0
-        map["items"] += [[id, x, y, orientation, collected_at_timestamp, level]]
+        map = save["maps"][town_id]
+        map["items"] += [[unit_id, x, y, orientation, collected_at_timestamp, level]]
 
     elif cmd == Constant.CMD_BUY_SUPER_OFFER_PACK:
         town_id = args[0]
@@ -530,6 +615,24 @@ def do_command(USERID, cmd, args):
         # save["maps"]["lastQuestTimes"] [quest_id] = TODO min (... , duration_sec)
 
         print(f"Ended quest {quest_id}.")
+
+    elif cmd == Constant.CMD_COLLECT_TREASURE:
+        # Sent when a village quest around the map is won (chapter 1: free the princess, then the next ones).
+        # args: [gold, xp, next_quest_id, food, stone, town_id]
+        gold = int(args[0])
+        xp = int(args[1])
+        next_quest_id = int(args[2])
+        food = int(args[3]) if len(args) > 3 else 0
+        stone = int(args[4]) if len(args) > 4 else 0
+        town_id = int(args[5]) if len(args) > 5 else 0
+        map = save["maps"][town_id]
+        map["coins"] += gold
+        map["xp"] += xp
+        map["food"] += food
+        map["stone"] += stone
+        map["idCurrentTreasure"] = next_quest_id
+        map["timestampLastTreasure"] = timestamp_now()
+        print(f"Village quest won: +{gold} gold, +{xp} xp, +{food} food, +{stone} stone. Next quest: {next_quest_id}")
 
     elif cmd == Constant.CMD_ADD_COLLECTABLE:
         collection_id = args[0]

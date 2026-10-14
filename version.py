@@ -7,13 +7,13 @@ version_code = "0.04a"
 
 def migrate_loaded_save(save: dict) -> bool:
 
+    # fix 0.01a saves (must come first: those saves have no "version" at all)
+    if "version" not in save or save["version"] is None:
+        save["version"] = "0.01a"
+
     # discard current version saves
     if save["version"] == version_code:
         return False
-    
-    # fix 0.01a saves
-    if "version" not in save or save["version"] is None:
-        save["version"] = "0.01a"
     
     # 0.01a -> 0.02a
     if save["version"] == "0.01a":

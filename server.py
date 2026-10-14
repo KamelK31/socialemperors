@@ -1,7 +1,8 @@
 print (" [+] Loading basics...")
 import os
 import json
-import urllib
+import urllib.request
+import urllib.error
 if os.name == 'nt':
     os.system("color")
     os.system("title Social Empires Server")
@@ -14,7 +15,7 @@ from get_game_config import get_game_config, patch_game_config
 
 print (" [+] Loading players...")
 from get_player_info import get_player_info, get_neighbor_info
-from sessions import load_saved_villages, all_saves_userid, all_saves_info, save_info, new_village, fb_friends_str
+from sessions import load_saved_villages, all_saves_userid, all_saves_info, save_info, new_village, fb_friends_str, save_lock
 load_saved_villages()
 
 print (" [+] Loading server...")
@@ -146,15 +147,16 @@ def static_assets_loader(path):
             URL = f"https://static.socialpointgames.com/static/socialempires/assets/{path}"
             try:
                 response = urllib.request.urlretrieve(URL, f"{BASE_DIR}/download_assets/assets/{path}")
-            except urllib.error.HTTPError:
+            except (urllib.error.URLError, OSError):
+                # Not on the CDN anymore, or no internet: answer 404 instead of crashing
                 return ("", 404)
 
             print(f"====== DOWNLOADED ASSET: {URL}")
-            return send_from_directory("{BASE_DIR}/download_assets/assets", path)
+            return send_from_directory(os.path.abspath(f"{BASE_DIR}/download_assets/assets"), path)
         else:
             # Use downloaded CDN asset
             print(f"====== USING EXTERNAL: download_assets/assets/{path}")
-            return send_from_directory("{BASE_DIR}/download_assets/assets", path)
+            return send_from_directory(os.path.abspath(f"{BASE_DIR}/download_assets/assets"), path)
     else:
         # Use provided asset
         return send_from_directory(ASSETS_DIR, path)
@@ -199,7 +201,8 @@ def get_player_info_response():
 
     # Current Player
     if user is None:
-        return (get_player_info(USERID), 200)
+        with save_lock:
+            return (json.loads(json.dumps(get_player_info(USERID))), 200)
     # Arthur
     elif user == Constant.NEIGHBOUR_ARTHUR_GUINEVERE_1 \
     or user == Constant.NEIGHBOUR_ARTHUR_GUINEVERE_2 \
@@ -234,7 +237,8 @@ def sync_error_track_response():
 
 @app.route("/null")
 def flash_sync_error_response():
-    sp_ref_cat = request.values['sp_ref_cat']
+    sp_ref_cat = request.values.get('sp_ref_cat', '')
+    reason = f"reload ({sp_ref_cat})"
 
     if sp_ref_cat == "flash_sync_error":
         reason = "reload On Sync Error"
