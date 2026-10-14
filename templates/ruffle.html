@@ -101,6 +101,7 @@
 					url: "http://{{SERVERIP}}:{{PORT}}/default01.static.socialpointgames.com/static/socialempires/flash/SELoader.swf?swftoload=http://{{SERVERIP}}:{{PORT}}/default01.static.socialpointgames.com/static/socialempires/flash/{{GAMEVERSION}}",
 					backgroundColor: "#669C2C",
 					allowScriptAccess: false,
+					allowFullscreen: true,	// lets the game's own full screen button work (Ruffle refuses it by default)
 					autoplay: true,
 					
 					parameters: 'spdebug=notnull&brk=0\
