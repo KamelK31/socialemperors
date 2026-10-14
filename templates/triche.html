@@ -69,6 +69,16 @@
 	</form>
 </div>
 <div class="card">
+	<h2>Royaume grec (plan de Claude)</h2>
+	<p class="muted">Dans l'ordre : 1. les terres, 2. le nettoyage, puis soit tu construis toi-m&ecirc;me (3a : tout arrive dans l'entrep&ocirc;t), soit tout est pos&eacute; d'un coup (3b).</p>
+	{% for act, label in [("terres","1. Débloquer toutes les terres"),("nettoyer","2. Retirer arbres et rochers de mes terres"),("plan_entrepot","3a. Mettre tout le plan dans l'entrepôt"),("plan_construire","3b. Construire tout le plan d'un coup")] %}
+	<form method="post" action="/triche/appliquer" style="display: inline;">
+		<input type="hidden" name="uid" value="{{ g.uid }}"><input type="hidden" name="action" value="{{ act }}">
+		<button class="btn{% if act == 'plan_construire' %} main{% endif %}" type="submit">{{ label }}</button>
+	</form>
+	{% endfor %}
+</div>
+<div class="card">
 	<h2>Divers</h2>
 	<form method="post" action="/triche/appliquer" style="display: inline;">
 		<input type="hidden" name="uid" value="{{ g.uid }}"><input type="hidden" name="action" value="quetes">
