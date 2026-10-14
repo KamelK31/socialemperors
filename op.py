@@ -52,6 +52,11 @@ def cmd_buy(player, cmd, args, gameversion, last_town_id):
 	if not item:
 		return False
 
+	# A pile harvested on the player's own land never comes back: the game then places a
+	# "Regenerating" stone/gold (and later a new pile) on the same tile - don't keep them.
+	if (item_id in RESOURCE_REGEN_IDS or item_id in RESOURCE_PILE_IDS) and is_owned_land(_map, x, y):
+		return True
+
 	if not is_free:
 		if not pay_resource_type(player, _map, item["cost_type"], int(int(item["cost"]) * price_mult)):
 			return False
