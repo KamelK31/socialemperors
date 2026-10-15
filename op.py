@@ -1256,7 +1256,8 @@ def cmd_start_quest_new(player, cmd, args, gameversion, last_town_id):
 	town_id = last_town_id
 	_map = player["maps"][town_id]
 
-	_map["lastQuestTimes"].append(timestamp_now())
+	if not get_server_config()["misc"].get("unlimited_quests", False):
+		_map["lastQuestTimes"].append(timestamp_now())
 
 	return True
 

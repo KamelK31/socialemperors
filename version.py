@@ -545,7 +545,11 @@ def save_reset_stuff(save, player_visiting_own_save = False):
 			if temp // 604800 != last_darts_reset // 604800:
 				privateState["timeStampDartsReset"] = 0
 
-		check_quest_times(map["lastQuestTimes"], now)
+		for town in save["maps"]:
+			if get_server_config()["misc"].get("unlimited_quests", False):
+				town["lastQuestTimes"].clear()	# no "3 quests every 6 hours" limit
+			else:
+				check_quest_times(town["lastQuestTimes"], now)
 		check_animals(save)
 		check_si_buildings(save)
 		daily_bonus_process(save, now)

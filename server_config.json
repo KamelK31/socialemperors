@@ -47,7 +47,8 @@
 		"assign_random_avatars":			false,
 		"no_resource_regeneration_on_owned_land":	true,
 		"backup_mirror_dir":				"auto",
-		"harder_quests":					false
+		"harder_quests":					false,
+		"unlimited_quests":					true
 	},
 	"events": 
 	[
