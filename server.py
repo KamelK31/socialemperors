@@ -241,29 +241,33 @@ async def js(path):
 
 ## GAME STATIC
 
+# The game's files never change (the patched game SWF is loaded with ?v=<its date>, see ruffle.html):
+# the browser keeps them for 30 days instead of asking the server again for each of them at every load.
+_ASSET_CACHE_SECONDS = 30 * 24 * 3600
+
 
 @app.route("/default01.static.socialpointgames.com/static/socialempires/swf/05122012_projectiles.swf")
 async def similar_05122012_projectiles():
-	return send_from_directory(ASSETS_DIR + "/swf", "20130417_projectiles.swf")
+	return send_from_directory(ASSETS_DIR + "/swf", max_age=_ASSET_CACHE_SECONDS, path="20130417_projectiles.swf")
 
 @app.route("/default01.static.socialpointgames.com/static/socialempires/swf/05122012_magicParticles.swf")
 async def similar_05122012_magicParticles():
-	return send_from_directory(ASSETS_DIR + "/swf", "20131010_magicParticles.swf")
+	return send_from_directory(ASSETS_DIR + "/swf", max_age=_ASSET_CACHE_SECONDS, path="20131010_magicParticles.swf")
 
 @app.route("/default01.static.socialpointgames.com/static/socialempires/swf/05122012_dynamic.swf")
 async def similar_05122012_dynamic():
-	return send_from_directory(ASSETS_DIR + "/swf", "120608_dynamic.swf")
+	return send_from_directory(ASSETS_DIR + "/swf", max_age=_ASSET_CACHE_SECONDS, path="120608_dynamic.swf")
 
 @app.route("/default01.static.socialpointgames.com/static/socialempires/<path:path>")
 async def static_assets_loader(path):
 	if os.path.exists(ASSETS_DIR + "/"+ path):
 		# Use provided asset
-		return send_from_directory(ASSETS_DIR, path)
+		return send_from_directory(ASSETS_DIR, path, max_age=_ASSET_CACHE_SECONDS)
 
 	downloaded_dir = f"{ASSETS_DIR}/../download_assets/assets"
 	if os.path.exists(f"{downloaded_dir}/{path}"):
 		# Use downloaded CDN asset
-		return send_from_directory(downloaded_dir, path)
+		return send_from_directory(downloaded_dir, path, max_age=_ASSET_CACHE_SECONDS)
 
 	# Not here: download it from SP's CDN, unless it failed recently (no internet, or the file is gone
 	# from the CDN): asking again for every missing image slows the game down for nothing.
@@ -288,7 +292,7 @@ async def static_assets_loader(path):
 	os.replace(target + ".part", target)
 	_failed_downloads.pop(path, None)
 	log.info(f"====== DOWNLOADED ASSET: {URL}")
-	return send_from_directory(downloaded_dir, path)
+	return send_from_directory(downloaded_dir, path, max_age=_ASSET_CACHE_SECONDS)
 
 _failed_downloads = {}		# asset path -> time of the last failed download
 _RETRY_FAILED_DOWNLOAD_SECONDS = 3600

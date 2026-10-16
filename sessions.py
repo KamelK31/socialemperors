@@ -888,7 +888,8 @@ def _write_json_atomic(path: str, data: dict, keep_bak: bool):
 	the file is never left half-written, even if the server window is closed during a save."""
 	tmp_path = path + ".tmp"
 	with open(tmp_path, 'w', encoding="utf-8") as f:
-		json.dump(data, f, indent='\t')
+		# compact: written by the fast C encoder (the indented form goes through a slow Python path)
+		f.write(json.dumps(data, separators=(',', ':')))
 		f.flush()
 		os.fsync(f.fileno())
 	if keep_bak and os.path.exists(path):

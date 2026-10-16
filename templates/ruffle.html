@@ -38,12 +38,11 @@
 				<a class="gameBarButton" href="/sauvegardes" target="_blank" title="Tes copies de secours, restaurer une ancienne partie"><div>Sauvegardes</div></a>
 				<a class="gameBarButton" href="/triche?uid={{save_info.userid}}" target="_blank" title="Menu de triche (seulement pour les parties de test)"><div>Triche</div></a>
 				<a class="gameBarButton" href="/bug" target="_blank" title="Cree un rapport a envoyer pour corriger un bug"><div>Signaler un bug</div></a>
-				<span class="gameBarButton" title="Qualite d'image : baisse-la si le jeu saccade"><div>Qualit&eacute;
-					<select id="quality" onchange="setQuality(this.value)" style="font-size: 9pt; border: none; background: transparent;">
-						<option value="best">Maximale</option>
-						<option value="high">Haute</option>
-						<option value="medium">Moyenne</option>
-						<option value="low">Basse</option>
+				<span class="gameBarButton" title="Rapide = image moins fine mais jeu plus fluide, surtout en plein ecran"><div>Affichage
+					<select id="perf" onchange="setPerf(this.value)" style="font-size: 9pt; border: none; background: transparent;">
+						<option value="beau">Beau</option>
+						<option value="equilibre">&Eacute;quilibr&eacute;</option>
+						<option value="rapide">Rapide</option>
 					</select></div></span>
 				<a class="gameBarButton" href="#" onclick="quitGame(); return false;" title="Enregistre ta partie et arrete le serveur"><div>Quitter</div></a>
 			</div>
@@ -97,18 +96,29 @@
 		</div>
 		<!-- EMBED GAME -->
 		<object>
+			<div id="gpu_warning" style="display: none; width: 740px; margin: 8px 0; padding: 8px 10px; text-align: left; font-size: 10pt; background: #fff3c4; border: 2px solid #c98a00; border-radius: 5px;">
+				<b>Ton navigateur n'utilise pas la carte graphique</b> : le jeu va saccader.
+				Dans Brave, ouvre <code>brave://settings/system</code>, active &laquo; Utiliser l'acc&eacute;l&eacute;ration graphique si disponible &raquo;, puis clique sur Relancer.
+			</div>
 			<div id="game_wrap"><div id='ruffle'></div></div>
 			<style>
 				#game_wrap:fullscreen { background-color: #669C2C; display: flex; align-items: center; justify-content: center; width: 100vw; height: 100vh; }
-				#game_wrap:fullscreen #ruffle { line-height: 0; }
+				#game_wrap:fullscreen #ruffle { line-height: 0; transform-origin: center center; }
 			</style>
 			<script>
-				// Image quality chosen in the game bar, remembered by this browser
-				var gameQuality = "high";
-				try { gameQuality = localStorage.getItem("se_quality") || "high"; } catch (e) {}
-				document.getElementById("quality").value = gameQuality;
-				function setQuality(q) {
-					try { localStorage.setItem("se_quality", q); } catch (e) {}
+				// Display mode chosen in the game bar, remembered by this browser:
+				//  beau      = best image quality, full screen drawn at the screen's resolution
+				//  equilibre = medium quality (no heavy anti-aliasing), full screen at the screen's resolution
+				//  rapide    = low quality, and in full screen the game is drawn at its own 760x600 size then
+				//              enlarged: several times fewer pixels to draw at each frame
+				var PERF = { beau: "high", equilibre: "medium", rapide: "low" };
+				var perfMode = "equilibre";
+				try { perfMode = localStorage.getItem("se_perf") || "equilibre"; } catch (e) {}
+				if (!(perfMode in PERF)) perfMode = "equilibre";
+				document.getElementById("perf").value = perfMode;
+				var gameQuality = PERF[perfMode];
+				function setPerf(m) {
+					try { localStorage.setItem("se_perf", m); } catch (e) {}
 					location.reload();
 				}
 
@@ -174,15 +184,24 @@
 				// Page full screen: the wrapper goes full screen (not the Ruffle player), so for the game nothing
 				// changes - it stays in its normal 760x600 mode and is only displayed bigger, keeping its proportions.
 				var gameWrap = document.getElementById("game_wrap");
+				var ruffleBox = document.getElementById("ruffle");
 				function fitGame() {
-					var w = 760, h = 600;
-					if (document.fullscreenElement === gameWrap) {
+					var w = 760, h = 600, full = document.fullscreenElement === gameWrap;
+					if (full) {
 						var ratio = 760 / 600;
 						w = window.innerWidth; h = window.innerHeight;
 						if (w / h > ratio) { w = Math.floor(h * ratio); } else { h = Math.floor(w / ratio); }
 					}
-					player.style.width = w + "px";
-					player.style.height = h + "px";
+					if (full && perfMode === "rapide") {
+						// drawn at 760x600, enlarged by the browser (clicks are mapped back by the browser)
+						player.style.width = "760px";
+						player.style.height = "600px";
+						ruffleBox.style.transform = "scale(" + (w / 760) + ")";
+					} else {
+						player.style.width = w + "px";
+						player.style.height = h + "px";
+						ruffleBox.style.transform = "";
+					}
 				}
 				function gameFullscreen() {
 					if (document.fullscreenElement) { document.exitFullscreen(); return; }
@@ -200,6 +219,26 @@
 						if (left <= 0) { clearInterval(timer); document.getElementById("quit_form").submit(); }
 					}, 1000);
 				}
+
+				// Without the graphics card, the browser draws the game with the processor: very slow.
+				(function checkGpu() {
+					var why = "";
+					try {
+						var c = document.createElement("canvas");
+						var gl = c.getContext("webgl2") || c.getContext("webgl");
+						if (!gl) { why = "pas de WebGL"; }
+						else {
+							var info = gl.getExtension("WEBGL_debug_renderer_info");
+							var name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
+							if (/swiftshader|llvmpipe|software|basic render/i.test(name)) { why = name; }
+						}
+					} catch (e) { why = "erreur WebGL"; }
+					if (why) {
+						var b = document.getElementById("gpu_warning");
+						b.style.display = "block";
+						b.title = why;
+					}
+				})();
 
 				document.addEventListener("fullscreenchange", fitGame);
 				window.addEventListener("resize", fitGame);

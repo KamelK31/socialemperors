@@ -14,7 +14,8 @@ Sauvegardes      tes copies de secours ; "Restaurer" remet une ancienne copie
                  (ta partie actuelle est copiee avant, tu peux toujours revenir)
 Signaler un bug  cree un fichier dans le dossier "rapports-bugs" : envoie-le a Claude
                  avec une capture d'ecran
-Qualite          baisse-la si le jeu saccade
+Affichage        Beau / Equilibre / Rapide : prends Rapide si le jeu saccade
+                 (en plein ecran, Rapide dessine le jeu en petit puis l'agrandit)
 Quitter          enregistre ta partie et arrete le serveur (la fenetre noire se ferme)
 Triche           menu de triche, seulement pour les parties cochees "partie de test"
                  (ressources, niveau, mana, potions, unites/batiments, attente des quetes)

@@ -9,3 +9,10 @@ GUI.GiftButtonLarge       Entrepot : "Sell" sur un objet en plusieurs exemplaire
 GUI.PortraitSpecialAttack Touches 1 a 9 : lancent les attaques speciales de l'unite selectionnee
                           (1 = en haut a gauche, 2 = en haut a droite, 3 = en bas a gauche, 4 = en bas a droite).
                           Les secondes restantes avant de pouvoir relancer s'affichent sur les attaques.
+com.adobe.serialization.json.JSON
+                          Lecture des donnees du serveur avec le lecteur JSON integre (natif) au lieu
+                          de l'ancien lecteur ecrit en ActionScript : chargement du jeu ~35 % plus rapide.
+battle.FXArrowAnimation   Un projectile dont le fichier n'est pas encore charge (p.lightning des tours
+                          mythologiques et des tours eclair) faisait planter l'image du jeu : la tour ne
+                          tirait jamais et le reste de l'image etait saute. Maintenant le fichier se charge
+                          et la tour tire.
